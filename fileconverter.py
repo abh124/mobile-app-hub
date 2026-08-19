@@ -313,8 +313,8 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
         selected_index=0,
         animation_duration=300,
         tabs=[
-            ft.Tab(text="Image Converter", icon=ft.Icons.IMAGE_SEARCH_ROUNDED, content=image_tab_content),
-            ft.Tab(text="Doc & Text to PDF", icon=ft.Icons.PICTURE_AS_PDF_ROUNDED, content=doc_tab_content),
+            ft.Tab(label="Image Converter", icon=ft.Icons.IMAGE_SEARCH_ROUNDED, content=image_tab_content),
+            ft.Tab(label="Doc & Text to PDF", icon=ft.Icons.PICTURE_AS_PDF_ROUNDED, content=doc_tab_content),
         ],
         expand=True,
     )
