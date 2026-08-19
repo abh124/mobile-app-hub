@@ -39,7 +39,8 @@ def get_compass_control(page: ft.Page) -> ft.Control:
     needle_container = ft.Container(
         content=needle_shape,
         alignment=ft.Alignment.CENTER,
-        rotate=ft.Rotate(angle=0, animate=ft.Animation(400, ft.AnimationCurve.EASE_OUT)),
+        rotate=ft.Rotate(angle=0),
+        animate_rotation=400,
     )
 
     # Compass Rose Dial
