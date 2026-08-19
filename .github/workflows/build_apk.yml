@@ -27,6 +27,10 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Accept Android SDK Licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
       - name: Install Dependencies & Flet
         run: |
           pip install --upgrade pip
@@ -35,10 +39,11 @@ jobs:
 
       - name: Build APK
         run: |
-          flet build apk
+          flet build apk --verbose
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: build/apk/*.apk
+
