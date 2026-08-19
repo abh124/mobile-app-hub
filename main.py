@@ -6,6 +6,8 @@ from voicetools import get_voice_tool_control
 from fileconverter import get_file_converter_control
 from ytdownloader import get_yt_downloader_control
 from compass import get_compass_control
+from mediaplayer import get_media_player_control
+
 
 
 
@@ -77,6 +79,12 @@ def main(page: ft.Page):
     def open_compass_tool(_):
         tool_content = get_compass_control(page)
         open_tool_page("Digital Compass 🧭", tool_content)
+
+    # --- 1f. MEDIA PLAYER (IMPORTED FROM mediaplayer.py) ---
+    def open_media_player_tool(_):
+        tool_content = get_media_player_control(page)
+        open_tool_page("Media Player 🎵", tool_content)
+
 
 
 
@@ -409,9 +417,10 @@ def main(page: ft.Page):
                     ]),
 
                     ft.Row([
+                        create_feature_button("Media Player", "Audio & Playlist", ft.Icons.MUSIC_NOTE_ROUNDED, ft.Colors.PURPLE_600, open_media_player_tool),
                         create_feature_button("Voice Tools", "TTS & STT", ft.Icons.RECORD_VOICE_OVER, ft.Colors.PINK_600, open_voice_tool),
-                        create_feature_button("Task Manager", "To-Do & List", ft.Icons.CHECK_BOX_OUTLINED, ft.Colors.BLUE_600, open_tasks_tool),
                     ]),
+
 
 
 
