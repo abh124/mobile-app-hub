@@ -29,10 +29,11 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
     img_preview = ft.Image(
         width=180,
         height=180,
-        fit=ft.ImageFit.CONTAIN,
+        fit="contain",
         visible=False,
         border_radius=12,
     )
+
 
     img_info_text = ft.Text("No image selected", size=13, color=ft.Colors.GREY_400)
 
@@ -67,7 +68,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
     converted_img_preview = ft.Image(
         width=180,
         height=180,
-        fit=ft.ImageFit.CONTAIN,
+        fit="contain",
         visible=False,
         border_radius=12,
     )
@@ -178,7 +179,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             ft.Button(
                 "Pick Image File",
                 icon=ft.Icons.IMAGE_OUTLINED,
-                on_click=lambda _: img_picker.pick_files(allow_multiple=False, file_type=ft.FilePickerFileType.IMAGE),
+                on_click=lambda _: img_picker.pick_files(allow_multiple=False, file_type="image"),
             ),
         ]),
         img_info_text,
