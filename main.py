@@ -16,6 +16,7 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     page.spacing = 0
+    page.scroll = ft.ScrollMode.AUTO
     
     # Configure phone window size preview for desktop
     page.window.width = 400
@@ -28,7 +29,7 @@ def main(page: ft.Page):
     counter_val = 0
 
     # --- PAGE CONTENT SWAP HELPER ---
-    body_container = ft.Column(scroll=ft.ScrollMode.AUTO)
+    body_container = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
 
     def show_home():
         body_container.controls.clear()
@@ -50,7 +51,7 @@ def main(page: ft.Page):
                 padding=10,
                 expand=True,
             ),
-        ], scroll=ft.ScrollMode.AUTO)
+        ], scroll=ft.ScrollMode.AUTO, expand=True)
         body_container.controls.clear()
         body_container.controls.append(tool_view)
         page.update()
