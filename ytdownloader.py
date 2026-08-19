@@ -79,7 +79,12 @@ def get_yt_downloader_control(page: ft.Page) -> ft.Control:
                 ydl_opts = {
                     'quiet': True,
                     'no_warnings': True,
-                    'extract_flat': False,
+                    'nocheckcertificate': True,
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android', 'web']
+                        }
+                    },
                 }
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
@@ -151,39 +156,28 @@ def get_yt_downloader_control(page: ft.Page) -> ft.Control:
 
                 out_tmpl = os.path.join(downloads_dir, "%(title)s.%(ext)s")
 
+                ydl_opts = {
+                    'outtmpl': out_tmpl,
+                    'progress_hooks': [progress_hook],
+                    'quiet': True,
+                    'no_warnings': True,
+                    'nocheckcertificate': True,
+                    'extractor_args': {
+                        'youtube': {
+                            'player_client': ['android', 'web']
+                        }
+                    },
+                }
+
                 if "Audio Only" in mode:
-                    ydl_opts = {
-                        'format': 'bestaudio/best',
-                        'outtmpl': out_tmpl,
-                        'progress_hooks': [progress_hook],
-                        'quiet': True,
-                        'no_warnings': True,
-                    }
+                    ydl_opts['format'] = 'bestaudio[ext=m4a]/bestaudio/best'
                 elif "720p" in mode:
-                    ydl_opts = {
-                        'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720]/best',
-                        'outtmpl': out_tmpl,
-                        'progress_hooks': [progress_hook],
-                        'quiet': True,
-                        'no_warnings': True,
-                    }
+                    ydl_opts['format'] = 'best[height<=720][ext=mp4]/best[height<=720]/best'
                 elif "480p" in mode:
-                    ydl_opts = {
-                        'format': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best[height<=480]/best',
-                        'outtmpl': out_tmpl,
-                        'progress_hooks': [progress_hook],
-                        'quiet': True,
-                        'no_warnings': True,
-                    }
+                    ydl_opts['format'] = 'best[height<=480][ext=mp4]/best[height<=480]/best'
                 else:
-                    # Best Quality
-                    ydl_opts = {
-                        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-                        'outtmpl': out_tmpl,
-                        'progress_hooks': [progress_hook],
-                        'quiet': True,
-                        'no_warnings': True,
-                    }
+                    # Best Single Format (No FFmpeg merging required)
+                    ydl_opts['format'] = 'best[ext=mp4]/best'
 
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
