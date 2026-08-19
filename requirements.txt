@@ -1,0 +1,4 @@
+flet
+pillow
+pyttsx3
+SpeechRecognition
