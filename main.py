@@ -4,6 +4,8 @@ import random
 from bgremouve import get_bg_remover_control
 from voicetools import get_voice_tool_control
 from fileconverter import get_file_converter_control
+from ytdownloader import get_yt_downloader_control
+
 
 def main(page: ft.Page):
     page.title = "Multi-Hub Mobile App"
@@ -63,6 +65,12 @@ def main(page: ft.Page):
     def open_file_converter_tool(_):
         tool_content = get_file_converter_control(page)
         open_tool_page("File Converter 📄", tool_content)
+
+    # --- 1d. YT DOWNLOADER (IMPORTED FROM ytdownloader.py) ---
+    def open_yt_downloader_tool(_):
+        tool_content = get_yt_downloader_control(page)
+        open_tool_page("YouTube Downloader 🎬", tool_content)
+
 
     # --- 2. TASK MANAGER TOOL ---
     task_input = ft.TextField(hint_text="New task...", expand=True, border_radius=12)
@@ -383,14 +391,15 @@ def main(page: ft.Page):
 
                     # FEATURE BUTTONS: PRIMARY TOOLS
                     ft.Row([
+                        create_feature_button("YT Downloader", "Video & MP3", ft.Icons.VIDEO_LIBRARY_ROUNDED, ft.Colors.RED_600, open_yt_downloader_tool),
                         create_feature_button("File Converter", "Docs & Images", ft.Icons.FILE_PRESENT_ROUNDED, ft.Colors.BLUE_ACCENT_700, open_file_converter_tool),
-                        create_feature_button("BG Remover", "Remove Photo BG", ft.Icons.AUTO_FIX_HIGH, ft.Colors.DEEP_ORANGE_600, open_bg_remover_tool),
                     ]),
 
                     ft.Row([
+                        create_feature_button("BG Remover", "Remove Photo BG", ft.Icons.AUTO_FIX_HIGH, ft.Colors.DEEP_ORANGE_600, open_bg_remover_tool),
                         create_feature_button("Voice Tools", "TTS & STT", ft.Icons.RECORD_VOICE_OVER, ft.Colors.PINK_600, open_voice_tool),
-                        create_feature_button("Task Manager", "To-Do & List", ft.Icons.CHECK_BOX_OUTLINED, ft.Colors.BLUE_600, open_tasks_tool),
                     ]),
+
 
 
                     # GRID OF FEATURE BUTTONS (Row 1)

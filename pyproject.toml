@@ -9,6 +9,7 @@ dependencies = [
     "pillow",
     "python-docx",
     "pypdf",
+    "yt-dlp",
 ]
 
 [tool.flet]
