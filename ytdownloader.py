@@ -162,6 +162,8 @@ def get_yt_downloader_control(page: ft.Page) -> ft.Control:
                     'quiet': True,
                     'no_warnings': True,
                     'nocheckcertificate': True,
+                    'restrictfilenames': True,
+                    'windowsfilenamemaxlength': 100,
                     'extractor_args': {
                         'youtube': {
                             'player_client': ['android', 'web']

@@ -5,6 +5,8 @@ from bgremouve import get_bg_remover_control
 from voicetools import get_voice_tool_control
 from fileconverter import get_file_converter_control
 from ytdownloader import get_yt_downloader_control
+from compass import get_compass_control
+
 
 
 def main(page: ft.Page):
@@ -70,6 +72,12 @@ def main(page: ft.Page):
     def open_yt_downloader_tool(_):
         tool_content = get_yt_downloader_control(page)
         open_tool_page("YouTube Downloader 🎬", tool_content)
+
+    # --- 1e. COMPASS TOOL (IMPORTED FROM compass.py) ---
+    def open_compass_tool(_):
+        tool_content = get_compass_control(page)
+        open_tool_page("Digital Compass 🧭", tool_content)
+
 
 
     # --- 2. TASK MANAGER TOOL ---
@@ -397,8 +405,14 @@ def main(page: ft.Page):
 
                     ft.Row([
                         create_feature_button("BG Remover", "Remove Photo BG", ft.Icons.AUTO_FIX_HIGH, ft.Colors.DEEP_ORANGE_600, open_bg_remover_tool),
-                        create_feature_button("Voice Tools", "TTS & STT", ft.Icons.RECORD_VOICE_OVER, ft.Colors.PINK_600, open_voice_tool),
+                        create_feature_button("Digital Compass", "Direction & Qibla", ft.Icons.EXPLORE_ROUNDED, ft.Colors.TEAL_700, open_compass_tool),
                     ]),
+
+                    ft.Row([
+                        create_feature_button("Voice Tools", "TTS & STT", ft.Icons.RECORD_VOICE_OVER, ft.Colors.PINK_600, open_voice_tool),
+                        create_feature_button("Task Manager", "To-Do & List", ft.Icons.CHECK_BOX_OUTLINED, ft.Colors.BLUE_600, open_tasks_tool),
+                    ]),
+
 
 
 
