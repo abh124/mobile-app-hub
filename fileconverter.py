@@ -2,6 +2,7 @@ import flet as ft
 import os
 import io
 import base64
+import threading
 from PIL import Image
 
 try:
@@ -34,7 +35,6 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
         visible=False,
         border_radius=12,
     )
-
 
     img_info_text = ft.Text("No image selected", size=13, color=ft.Colors.GREY_400)
 
@@ -76,30 +76,81 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
     )
     download_btn = ft.Container(visible=False)
 
-    def on_img_picked(e: ft.FilePickerResultEvent):
-        if e.files and len(e.files) > 0:
-            picked_file = e.files[0]
-            selected_img_name[0] = picked_file.name
-            if picked_file.path and os.path.exists(picked_file.path):
-                with open(picked_file.path, "rb") as f:
-                    selected_img_bytes[0] = f.read()
-            elif picked_file.bytes:
-                selected_img_bytes[0] = picked_file.bytes
-
-            if selected_img_bytes[0]:
-                img = Image.open(io.BytesIO(selected_img_bytes[0]))
-                img_info_text.value = f"Selected: {picked_file.name} ({img.width}x{img.height} px, {img.format})"
-                img_preview.src_base64 = base64.b64encode(selected_img_bytes[0]).decode("utf-8")
-                img_preview.visible = True
-                set_status("Image loaded successfully!", ft.Colors.GREEN_400)
-            else:
-                set_status("Failed to read image data.", ft.Colors.RED_400)
+    def load_image_bytes(img_bytes: bytes, file_name: str):
+        try:
+            selected_img_bytes[0] = img_bytes
+            selected_img_name[0] = file_name
+            img = Image.open(io.BytesIO(img_bytes))
+            img_info_text.value = f"Selected: {file_name} ({img.width}x{img.height} px, {img.format})"
+            img_preview.src_base64 = base64.b64encode(img_bytes).decode("utf-8")
+            img_preview.visible = True
+            set_status("Image loaded successfully!", ft.Colors.GREEN_400)
+        except Exception as ex:
+            set_status(f"Error reading image: {ex}", ft.Colors.RED_400)
         page.update()
 
-    img_picker = ft.FilePicker()
-    img_picker.on_result = on_img_picked
-    if img_picker not in page.overlay:
-        page.overlay.append(img_picker)
+    def pick_image_file(_):
+        def _open():
+            try:
+                from tkinter import Tk, filedialog
+                root = Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                fpath = filedialog.askopenfilename(
+                    title="Select Image File",
+                    filetypes=[
+                        ("Image Files", "*.png *.jpg *.jpeg *.webp *.bmp"),
+                        ("All Files", "*.*"),
+                    ]
+                )
+                root.destroy()
+                if fpath and os.path.exists(fpath):
+                    with open(fpath, "rb") as f:
+                        data = f.read()
+                    load_image_bytes(data, os.path.basename(fpath))
+            except Exception:
+                # Fallback to Flet FilePicker if tkinter is unavailable
+                def on_img_picked(e: ft.FilePickerResultEvent):
+                    if e.files and len(e.files) > 0:
+                        picked_file = e.files[0]
+                        if picked_file.path and os.path.exists(picked_file.path):
+                            with open(picked_file.path, "rb") as f:
+                                b = f.read()
+                            load_image_bytes(b, picked_file.name)
+                        elif picked_file.bytes:
+                            load_image_bytes(picked_file.bytes, picked_file.name)
+
+                fp = ft.FilePicker()
+                fp.on_result = on_img_picked
+                page.overlay.append(fp)
+                page.update()
+                fp.pick_files(allow_multiple=False, file_type="image")
+
+        threading.Thread(target=_open, daemon=True).start()
+
+    def save_bytes_to_file(bytes_data: bytes, default_name: str):
+        def _save():
+            try:
+                from tkinter import Tk, filedialog
+                root = Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                ext = os.path.splitext(default_name)[1]
+                fpath = filedialog.asksaveasfilename(
+                    title="Save Output File",
+                    initialfile=default_name,
+                    defaultextension=ext,
+                    filetypes=[(f"*{ext}", f"*{ext}"), ("All Files", "*.*")]
+                )
+                root.destroy()
+                if fpath:
+                    with open(fpath, "wb") as f:
+                        f.write(bytes_data)
+                    set_status(f"File saved to {os.path.basename(fpath)}!", ft.Colors.GREEN_400)
+            except Exception as ex:
+                set_status(f"Save error: {ex}", ft.Colors.RED_400)
+
+        threading.Thread(target=_save, daemon=True).start()
 
     def convert_image(_):
         if not selected_img_bytes[0]:
@@ -137,7 +188,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                     res_img = res_img.convert("RGB")
                 res_img.save(output_io, format="BMP")
                 ext = "bmp"
-            else: # PNG default
+            else:  # PNG default
                 res_img.save(output_io, format="PNG")
                 ext = "png"
 
@@ -149,25 +200,13 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             else:
                 converted_img_preview.visible = False
 
-            # Setup Download / Save
-            def save_output_file(_):
-                def on_save_result(e: ft.FilePickerResultEvent):
-                    if e.path:
-                        with open(e.path, "wb") as f:
-                            f.write(out_bytes)
-                        set_status(f"File saved to {os.path.basename(e.path)}!", ft.Colors.GREEN_400)
-
-                save_picker = ft.FilePicker()
-                save_picker.on_result = on_save_result
-                page.overlay.append(save_picker)
-                page.update()
-                base_name = os.path.splitext(selected_img_name[0])[0] or "converted_file"
-                save_picker.save_file(file_name=f"{base_name}_converted.{ext}")
+            base_name = os.path.splitext(selected_img_name[0])[0] or "converted_file"
+            file_out_name = f"{base_name}_converted.{ext}"
 
             download_btn.content = ft.Button(
                 f"Save Converted File (.{ext.upper()})",
                 icon=ft.Icons.DOWNLOAD_ROUNDED,
-                on_click=save_output_file,
+                on_click=lambda _: save_bytes_to_file(out_bytes, file_out_name),
                 style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color=ft.Colors.WHITE),
             )
             download_btn.visible = True
@@ -183,7 +222,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             ft.Button(
                 "Pick Image File",
                 icon=ft.Icons.IMAGE_OUTLINED,
-                on_click=lambda _: img_picker.pick_files(allow_multiple=False, file_type="image"),
+                on_click=pick_image_file,
             ),
         ]),
         img_info_text,
@@ -215,31 +254,25 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             page.update()
             return
 
-        def on_save_docx(e: ft.FilePickerResultEvent):
-            if e.path:
-                try:
-                    if HAS_DOCX:
-                        doc = docx.Document()
-                        doc.add_heading("Generated Document", level=1)
-                        for line in txt.split("\n"):
-                            doc.add_paragraph(line)
-                        doc.save(e.path)
-                    else:
-                        # Fallback plain text write with .docx extension
-                        with open(e.path, "w", encoding="utf-8") as f:
-                            f.write(txt)
-                    doc_status.value = f"Saved to {os.path.basename(e.path)}!"
-                    doc_status.color = ft.Colors.GREEN_400
-                except Exception as ex:
-                    doc_status.value = f"Error saving file: {ex}"
-                    doc_status.color = ft.Colors.RED_400
-                page.update()
+        try:
+            out_io = io.BytesIO()
+            if HAS_DOCX:
+                doc = docx.Document()
+                doc.add_heading("Generated Document", level=1)
+                for line in txt.split("\n"):
+                    doc.add_paragraph(line)
+                doc.save(out_io)
+                docx_bytes = out_io.getvalue()
+            else:
+                docx_bytes = txt.encode("utf-8")
 
-        save_picker = ft.FilePicker()
-        save_picker.on_result = on_save_docx
-        page.overlay.append(save_picker)
+            save_bytes_to_file(docx_bytes, "Document.docx")
+            doc_status.value = "Preparing file download dialog..."
+            doc_status.color = ft.Colors.GREEN_400
+        except Exception as ex:
+            doc_status.value = f"Error creating docx: {ex}"
+            doc_status.color = ft.Colors.RED_400
         page.update()
-        save_picker.save_file(file_name="Document.docx", allowed_extensions=["docx", "txt"])
 
     def create_pdf_from_text(_):
         txt = doc_text_input.value.strip()
@@ -249,41 +282,30 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             page.update()
             return
 
-        def on_save_pdf(e: ft.FilePickerResultEvent):
-            if e.path:
-                try:
-                    # Generate a clean PDF using PIL canvas rendering
-                    lines = txt.split("\n")
-                    # Create blank page image (A4 ratio approx)
-                    img = Image.new("RGB", (1240, 1754), color="white")
-                    from PIL import ImageDraw, ImageFont
-                    draw = ImageDraw.Draw(img)
-                    
-                    y = 100
-                    for line in lines:
-                        draw.text((80, y), line, fill="black")
-                        y += 40
-                        if y > 1650:
-                            break
+        try:
+            lines = txt.split("\n")
+            img = Image.new("RGB", (1240, 1754), color="white")
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(img)
 
-                    pdf_bytes = io.BytesIO()
-                    img.save(pdf_bytes, format="PDF")
+            y = 100
+            for line in lines:
+                draw.text((80, y), line, fill="black")
+                y += 40
+                if y > 1650:
+                    break
 
-                    with open(e.path, "wb") as f:
-                        f.write(pdf_bytes.getvalue())
+            pdf_io = io.BytesIO()
+            img.save(pdf_io, format="PDF")
+            pdf_bytes = pdf_io.getvalue()
 
-                    doc_status.value = f"PDF saved to {os.path.basename(e.path)}!"
-                    doc_status.color = ft.Colors.GREEN_400
-                except Exception as ex:
-                    doc_status.value = f"PDF generation error: {ex}"
-                    doc_status.color = ft.Colors.RED_400
-                page.update()
-
-        save_picker = ft.FilePicker()
-        save_picker.on_result = on_save_pdf
-        page.overlay.append(save_picker)
+            save_bytes_to_file(pdf_bytes, "Converted_Document.pdf")
+            doc_status.value = "Preparing PDF download dialog..."
+            doc_status.color = ft.Colors.GREEN_400
+        except Exception as ex:
+            doc_status.value = f"PDF generation error: {ex}"
+            doc_status.color = ft.Colors.RED_400
         page.update()
-        save_picker.save_file(file_name="Converted_Document.pdf", allowed_extensions=["pdf"])
 
     doc_tab_content = ft.Column([
         ft.Text("Document & Text Converter", size=16, weight=ft.FontWeight.BOLD),
@@ -343,4 +365,3 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
         ft.Divider(),
         content_area,
     ], expand=True, scroll=ft.ScrollMode.AUTO)
-
