@@ -308,18 +308,39 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
         ft.Text("• Convert images to PNG, JPG, WEBP, BMP & PDF\n• Scale and compress image file sizes\n• Export notes & text directly to Word (.docx) & PDF documents", size=12, color=ft.Colors.GREY_500),
     ], spacing=12)
 
-    # --- MAIN TABS CONTAINER ---
-    tabs = ft.Tabs(
-        selected_index=0,
-        animation_duration=300,
-        tabs=[
-            ft.Tab(label="Image Converter", icon=ft.Icons.IMAGE_SEARCH_ROUNDED, content=image_tab_content),
-            ft.Tab(label="Doc & Text to PDF", icon=ft.Icons.PICTURE_AS_PDF_ROUNDED, content=doc_tab_content),
-        ],
-        expand=True,
+    # --- SECTION SWITCHER CONTAINER ---
+    content_area = ft.Container(content=image_tab_content, expand=True)
+
+    btn_img_tab = ft.Button(
+        "Image Converter 🖼️",
+        style=ft.ButtonStyle(bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE, shape=ft.RoundedRectangleBorder(radius=10)),
     )
+    btn_doc_tab = ft.Button(
+        "Doc & Text to PDF 📄",
+        style=ft.ButtonStyle(bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, color=ft.Colors.WHITE, shape=ft.RoundedRectangleBorder(radius=10)),
+    )
+
+    def show_img_section(_):
+        btn_img_tab.style.bgcolor = ft.Colors.INDIGO_700
+        btn_doc_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
+        content_area.content = image_tab_content
+        page.update()
+
+    def show_doc_section(_):
+        btn_img_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
+        btn_doc_tab.style.bgcolor = ft.Colors.INDIGO_700
+        content_area.content = doc_tab_content
+        page.update()
+
+    btn_img_tab.on_click = show_img_section
+    btn_doc_tab.on_click = show_doc_section
+
+    toggle_bar = ft.Row([btn_img_tab, btn_doc_tab], alignment=ft.MainAxisAlignment.CENTER, wrap=True)
 
     return ft.Column([
         status_text,
-        tabs,
+        toggle_bar,
+        ft.Divider(),
+        content_area,
     ], expand=True, scroll=ft.ScrollMode.AUTO)
+
