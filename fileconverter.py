@@ -27,6 +27,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
     selected_img_name = [""]
 
     img_preview = ft.Image(
+        src="",
         width=180,
         height=180,
         fit="contain",
@@ -66,6 +67,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
     )
 
     converted_img_preview = ft.Image(
+        src="",
         width=180,
         height=180,
         fit="contain",
