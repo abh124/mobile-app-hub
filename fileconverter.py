@@ -11,9 +11,15 @@ try:
 except ImportError:
     HAS_DOCX = False
 
+try:
+    import pypdf
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
+
 
 def get_file_converter_control(page: ft.Page) -> ft.Control:
-    """Returns the Flet Control UI for File Converter (Images, Documents, PDFs)."""
+    """Returns the Flet Control UI for File Converter (PDF, Word, Images, Text)."""
 
     status_text = ft.Text("", size=13, weight=ft.FontWeight.W_500)
 
@@ -23,7 +29,210 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
         status_text.color = color
         page.update()
 
-    # --- TAB 1: IMAGE CONVERTER & RESIZER ---
+    def save_bytes_to_file(bytes_data: bytes, default_name: str):
+        def _save():
+            try:
+                from tkinter import Tk, filedialog
+                root = Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                ext = os.path.splitext(default_name)[1]
+                fpath = filedialog.asksaveasfilename(
+                    title="Save Converted File",
+                    initialfile=default_name,
+                    defaultextension=ext,
+                    filetypes=[(f"*{ext}", f"*{ext}"), ("All Files", "*.*")]
+                )
+                root.destroy()
+                if fpath:
+                    with open(fpath, "wb") as f:
+                        f.write(bytes_data)
+                    set_status(f"File saved to {os.path.basename(fpath)}!", ft.Colors.GREEN_400)
+            except Exception as ex:
+                set_status(f"Save error: {ex}", ft.Colors.RED_400)
+
+        threading.Thread(target=_save, daemon=True).start()
+
+    # --- SECTION 1: DIRECT PDF <-> WORD (DOCX) CONVERTER ---
+    doc_file_bytes = [None]
+    doc_file_name = [""]
+    doc_info_text = ft.Text("No document or PDF selected.", size=13, color=ft.Colors.GREY_400)
+    doc_action_container = ft.Container(visible=False)
+
+    def load_doc_file(file_bytes: bytes, file_name: str):
+        doc_file_bytes[0] = file_bytes
+        doc_file_name[0] = file_name
+        ext = os.path.splitext(file_name)[1].lower()
+
+        doc_info_text.value = f"Selected: {file_name} ({len(file_bytes) // 1024} KB)"
+        set_status(f"Loaded {file_name}!", ft.Colors.GREEN_400)
+
+        if ext == ".pdf":
+            # PDF selected -> Show "Convert to Word (.docx)"
+            def run_pdf_to_docx(_):
+                try:
+                    set_status("Extracting PDF text and generating Word document...", ft.Colors.BLUE_400)
+                    pdf_stream = io.BytesIO(doc_file_bytes[0])
+                    reader = pypdf.PdfReader(pdf_stream)
+                    
+                    if HAS_DOCX:
+                        doc = docx.Document()
+                        doc.add_heading(f"Converted from {file_name}", level=1)
+                        for i, p in enumerate(reader.pages):
+                            doc.add_heading(f"Page {i+1}", level=2)
+                            text = p.extract_text() or ""
+                            for line in text.split("\n"):
+                                if line.strip():
+                                    doc.add_paragraph(line.strip())
+                        out_io = io.BytesIO()
+                        doc.save(out_io)
+                        out_bytes = out_io.getvalue()
+                        out_ext = ".docx"
+                    else:
+                        full_text = []
+                        for i, p in enumerate(reader.pages):
+                            full_text.append(f"--- Page {i+1} ---\n" + (p.extract_text() or ""))
+                        out_bytes = ("\n\n".join(full_text)).encode("utf-8")
+                        out_ext = ".txt"
+
+                    out_name = os.path.splitext(file_name)[0] + f"_converted{out_ext}"
+                    save_bytes_to_file(out_bytes, out_name)
+                    set_status(f"Conversion complete! Click save dialog to keep file.", ft.Colors.GREEN_400)
+                except Exception as ex:
+                    set_status(f"PDF to Word error: {ex}", ft.Colors.RED_400)
+
+            doc_action_container.content = ft.Button(
+                "Convert PDF ➔ Word (.DOCX)",
+                icon=ft.Icons.SUBTITLES_ROUNDED,
+                on_click=run_pdf_to_docx,
+                style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE),
+            )
+            doc_action_container.visible = True
+
+        elif ext in (".docx", ".doc"):
+            # Word selected -> Show "Convert to PDF (.pdf)"
+            def run_docx_to_pdf(_):
+                try:
+                    set_status("Reading Word file and generating PDF...", ft.Colors.BLUE_400)
+                    if not HAS_DOCX:
+                        set_status("python-docx is required for Word conversion", ft.Colors.RED_400)
+                        return
+
+                    doc_stream = io.BytesIO(doc_file_bytes[0])
+                    doc = docx.Document(doc_stream)
+                    paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+                    if not paragraphs:
+                        paragraphs = ["(Empty Word Document)"]
+
+                    # Render paragraphs to multi-page PDF using PIL canvas
+                    from PIL import ImageDraw
+                    img_pages = []
+                    lines_per_page = 36
+                    current_lines = []
+
+                    for p in paragraphs:
+                        words = p.split()
+                        line = ""
+                        for w in words:
+                            if len(line) + len(w) + 1 > 70:
+                                current_lines.append(line)
+                                line = w
+                            else:
+                                line = (line + " " + w).strip()
+                        if line:
+                            current_lines.append(line)
+                        current_lines.append("")  # paragraph gap
+
+                        if len(current_lines) >= lines_per_page:
+                            img = Image.new("RGB", (1240, 1754), color="white")
+                            draw = ImageDraw.Draw(img)
+                            y = 90
+                            for l in current_lines[:lines_per_page]:
+                                draw.text((80, y), l, fill="black")
+                                y += 42
+                            img_pages.append(img)
+                            current_lines = current_lines[lines_per_page:]
+
+                    if current_lines:
+                        img = Image.new("RGB", (1240, 1754), color="white")
+                        draw = ImageDraw.Draw(img)
+                        y = 90
+                        for l in current_lines:
+                            draw.text((80, y), l, fill="black")
+                            y += 42
+                        img_pages.append(img)
+
+                    if not img_pages:
+                        img_pages.append(Image.new("RGB", (1240, 1754), color="white"))
+
+                    pdf_io = io.BytesIO()
+                    img_pages[0].save(pdf_io, format="PDF", save_all=True, append_images=img_pages[1:])
+                    pdf_bytes = pdf_io.getvalue()
+
+                    out_name = os.path.splitext(file_name)[0] + "_converted.pdf"
+                    save_bytes_to_file(pdf_bytes, out_name)
+                    set_status("Conversion complete! Click save dialog.", ft.Colors.GREEN_400)
+                except Exception as ex:
+                    set_status(f"Word to PDF error: {ex}", ft.Colors.RED_400)
+
+            doc_action_container.content = ft.Button(
+                "Convert Word ➔ PDF (.PDF)",
+                icon=ft.Icons.PICTURE_IN_PICTURE_ROUNDED,
+                on_click=run_docx_to_pdf,
+                style=ft.ButtonStyle(bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE),
+            )
+            doc_action_container.visible = True
+        else:
+            set_status("Please select a valid .pdf or .docx file", ft.Colors.AMBER_400)
+            doc_action_container.visible = False
+
+        page.update()
+
+    def pick_doc_or_pdf_file(_):
+        def _open():
+            try:
+                from tkinter import Tk, filedialog
+                root = Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                fpath = filedialog.askopenfilename(
+                    title="Select PDF or Word Document",
+                    filetypes=[
+                        ("PDF & Word Files", "*.pdf *.docx *.doc"),
+                        ("PDF Files", "*.pdf"),
+                        ("Word Documents", "*.docx *.doc"),
+                        ("All Files", "*.*"),
+                    ]
+                )
+                root.destroy()
+                if fpath and os.path.exists(fpath):
+                    with open(fpath, "rb") as f:
+                        b = f.read()
+                    load_doc_file(b, os.path.basename(fpath))
+            except Exception as ex:
+                set_status(f"File picker error: {ex}", ft.Colors.RED_400)
+
+        threading.Thread(target=_open, daemon=True).start()
+
+    pdf_word_section_content = ft.Column([
+        ft.Text("PDF ➔ Word & Word ➔ PDF Converter", size=16, weight=ft.FontWeight.BOLD),
+        ft.Text("Select a PDF file to convert to Word (.docx), or a Word file to convert to PDF.", size=12, color=ft.Colors.GREY_400),
+        ft.Row([
+            ft.Button(
+                "Select PDF or Word File",
+                icon=ft.Icons.UPLOAD_FILE_ROUNDED,
+                on_click=pick_doc_or_pdf_file,
+                style=ft.ButtonStyle(bgcolor=ft.Colors.INDIGO_600, color=ft.Colors.WHITE),
+            ),
+        ]),
+        doc_info_text,
+        doc_action_container,
+        ft.Divider(),
+        ft.Text("Features:", size=13, color=ft.Colors.GREY_400),
+        ft.Text("• Instant PDF text extraction into editable Word (.docx) files\n• Converts Word documents into formatted PDF files\n• Safe, local, non-cloud conversion", size=12, color=ft.Colors.GREY_500),
+    ], spacing=12)
+
+    # --- SECTION 2: IMAGE CONVERTER & RESIZER ---
     selected_img_bytes = [None]
     selected_img_name = [""]
 
@@ -108,49 +317,10 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                     with open(fpath, "rb") as f:
                         data = f.read()
                     load_image_bytes(data, os.path.basename(fpath))
-            except Exception:
-                # Fallback to Flet FilePicker if tkinter is unavailable
-                def on_img_picked(e: ft.FilePickerResultEvent):
-                    if e.files and len(e.files) > 0:
-                        picked_file = e.files[0]
-                        if picked_file.path and os.path.exists(picked_file.path):
-                            with open(picked_file.path, "rb") as f:
-                                b = f.read()
-                            load_image_bytes(b, picked_file.name)
-                        elif picked_file.bytes:
-                            load_image_bytes(picked_file.bytes, picked_file.name)
-
-                fp = ft.FilePicker()
-                fp.on_result = on_img_picked
-                page.overlay.append(fp)
-                page.update()
-                fp.pick_files(allow_multiple=False, file_type="image")
+            except Exception as ex:
+                set_status(f"Image picker error: {ex}", ft.Colors.RED_400)
 
         threading.Thread(target=_open, daemon=True).start()
-
-    def save_bytes_to_file(bytes_data: bytes, default_name: str):
-        def _save():
-            try:
-                from tkinter import Tk, filedialog
-                root = Tk()
-                root.withdraw()
-                root.attributes('-topmost', True)
-                ext = os.path.splitext(default_name)[1]
-                fpath = filedialog.asksaveasfilename(
-                    title="Save Output File",
-                    initialfile=default_name,
-                    defaultextension=ext,
-                    filetypes=[(f"*{ext}", f"*{ext}"), ("All Files", "*.*")]
-                )
-                root.destroy()
-                if fpath:
-                    with open(fpath, "wb") as f:
-                        f.write(bytes_data)
-                    set_status(f"File saved to {os.path.basename(fpath)}!", ft.Colors.GREEN_400)
-            except Exception as ex:
-                set_status(f"Save error: {ex}", ft.Colors.RED_400)
-
-        threading.Thread(target=_save, daemon=True).start()
 
     def convert_image(_):
         if not selected_img_bytes[0]:
@@ -161,7 +331,6 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             set_status("Converting image...", ft.Colors.BLUE_400)
             raw_img = Image.open(io.BytesIO(selected_img_bytes[0]))
 
-            # Resize scale calculation
             scale = int(resize_scale.value.replace("%", "")) / 100.0
             new_w = max(1, int(raw_img.width * scale))
             new_h = max(1, int(raw_img.height * scale))
@@ -188,7 +357,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                     res_img = res_img.convert("RGB")
                 res_img.save(output_io, format="BMP")
                 ext = "bmp"
-            else:  # PNG default
+            else:
                 res_img.save(output_io, format="PNG")
                 ext = "png"
 
@@ -236,7 +405,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
         download_btn,
     ], spacing=12)
 
-    # --- TAB 2: DOCUMENT & TEXT TO PDF CONVERTER ---
+    # --- SECTION 3: QUICK TEXT TO DOCX / PDF ---
     doc_text_input = ft.TextField(
         hint_text="Paste or type text here to generate a Word (.docx) or PDF file...",
         multiline=True,
@@ -246,7 +415,7 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
     )
     doc_status = ft.Text("", size=13)
 
-    def create_docx_file(_):
+    def create_docx_from_text(_):
         txt = doc_text_input.value.strip()
         if not txt:
             doc_status.value = "Please enter some text first!"
@@ -307,15 +476,15 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
             doc_status.color = ft.Colors.RED_400
         page.update()
 
-    doc_tab_content = ft.Column([
-        ft.Text("Document & Text Converter", size=16, weight=ft.FontWeight.BOLD),
+    text_tab_content = ft.Column([
+        ft.Text("Quick Text ➔ Word / PDF", size=16, weight=ft.FontWeight.BOLD),
         doc_text_input,
         doc_status,
         ft.Row([
             ft.Button(
                 "Export as Word (.DOCX)",
                 icon=ft.Icons.DESCRIPTION_ROUNDED,
-                on_click=create_docx_file,
+                on_click=create_docx_from_text,
                 style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_700, color=ft.Colors.WHITE),
             ),
             ft.Button(
@@ -325,39 +494,50 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                 style=ft.ButtonStyle(bgcolor=ft.Colors.RED_700, color=ft.Colors.WHITE),
             ),
         ], wrap=True),
-        ft.Divider(),
-        ft.Text("Word (.docx) / File Features:", size=13, color=ft.Colors.GREY_400),
-        ft.Text("• Convert images to PNG, JPG, WEBP, BMP & PDF\n• Scale and compress image file sizes\n• Export notes & text directly to Word (.docx) & PDF documents", size=12, color=ft.Colors.GREY_500),
     ], spacing=12)
 
     # --- SECTION SWITCHER CONTAINER ---
-    content_area = ft.Container(content=image_tab_content, expand=True)
+    content_area = ft.Container(content=pdf_word_section_content, expand=True)
 
-    btn_img_tab = ft.Button(
-        "Image Converter 🖼️",
+    btn_pdf_word = ft.Button(
+        "PDF ↔ Word 📄",
         style=ft.ButtonStyle(bgcolor=ft.Colors.INDIGO_700, color=ft.Colors.WHITE, shape=ft.RoundedRectangleBorder(radius=10)),
     )
-    btn_doc_tab = ft.Button(
-        "Doc & Text to PDF 📄",
+    btn_img_tab = ft.Button(
+        "Image Converter 🖼️",
+        style=ft.ButtonStyle(bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, color=ft.Colors.WHITE, shape=ft.RoundedRectangleBorder(radius=10)),
+    )
+    btn_text_tab = ft.Button(
+        "Text to Doc 📝",
         style=ft.ButtonStyle(bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST, color=ft.Colors.WHITE, shape=ft.RoundedRectangleBorder(radius=10)),
     )
 
+    def show_pdf_word(_):
+        btn_pdf_word.style.bgcolor = ft.Colors.INDIGO_700
+        btn_img_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
+        btn_text_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
+        content_area.content = pdf_word_section_content
+        page.update()
+
     def show_img_section(_):
+        btn_pdf_word.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
         btn_img_tab.style.bgcolor = ft.Colors.INDIGO_700
-        btn_doc_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
+        btn_text_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
         content_area.content = image_tab_content
         page.update()
 
-    def show_doc_section(_):
+    def show_text_section(_):
+        btn_pdf_word.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
         btn_img_tab.style.bgcolor = ft.Colors.SURFACE_CONTAINER_HIGHEST
-        btn_doc_tab.style.bgcolor = ft.Colors.INDIGO_700
-        content_area.content = doc_tab_content
+        btn_text_tab.style.bgcolor = ft.Colors.INDIGO_700
+        content_area.content = text_tab_content
         page.update()
 
+    btn_pdf_word.on_click = show_pdf_word
     btn_img_tab.on_click = show_img_section
-    btn_doc_tab.on_click = show_doc_section
+    btn_text_tab.on_click = show_text_section
 
-    toggle_bar = ft.Row([btn_img_tab, btn_doc_tab], alignment=ft.MainAxisAlignment.CENTER, wrap=True)
+    toggle_bar = ft.Row([btn_pdf_word, btn_img_tab, btn_text_tab], alignment=ft.MainAxisAlignment.CENTER, wrap=True)
 
     return ft.Column([
         status_text,
