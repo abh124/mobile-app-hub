@@ -1,0 +1,14 @@
+[project]
+name = "mobile-app-hub"
+version = "0.1.0"
+description = "Multi-Hub Mobile App"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "flet",
+    "pillow",
+]
+
+[tool.flet]
+org = "com.mobileapphub"
+product = "MobileAppHub"
