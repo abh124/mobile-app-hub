@@ -96,7 +96,8 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                 set_status("Failed to read image data.", ft.Colors.RED_400)
         page.update()
 
-    img_picker = ft.FilePicker(on_result=on_img_picked)
+    img_picker = ft.FilePicker()
+    img_picker.on_result = on_img_picked
     if img_picker not in page.overlay:
         page.overlay.append(img_picker)
 
@@ -156,7 +157,8 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                             f.write(out_bytes)
                         set_status(f"File saved to {os.path.basename(e.path)}!", ft.Colors.GREEN_400)
 
-                save_picker = ft.FilePicker(on_result=on_save_result)
+                save_picker = ft.FilePicker()
+                save_picker.on_result = on_save_result
                 page.overlay.append(save_picker)
                 page.update()
                 base_name = os.path.splitext(selected_img_name[0])[0] or "converted_file"
@@ -233,7 +235,8 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                     doc_status.color = ft.Colors.RED_400
                 page.update()
 
-        save_picker = ft.FilePicker(on_result=on_save_docx)
+        save_picker = ft.FilePicker()
+        save_picker.on_result = on_save_docx
         page.overlay.append(save_picker)
         page.update()
         save_picker.save_file(file_name="Document.docx", allowed_extensions=["docx", "txt"])
@@ -276,7 +279,8 @@ def get_file_converter_control(page: ft.Page) -> ft.Control:
                     doc_status.color = ft.Colors.RED_400
                 page.update()
 
-        save_picker = ft.FilePicker(on_result=on_save_pdf)
+        save_picker = ft.FilePicker()
+        save_picker.on_result = on_save_pdf
         page.overlay.append(save_picker)
         page.update()
         save_picker.save_file(file_name="Converted_Document.pdf", allowed_extensions=["pdf"])
